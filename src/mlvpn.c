@@ -53,6 +53,7 @@
 #include "control.h"
 #endif
 #include "tuntap_generic.h"
+#include "udplite.h"
 
 /* Linux specific things */
 #ifdef HAVE_LINUX
@@ -784,6 +785,7 @@ mlvpn_rtun_bind(mlvpn_tunnel_t *t)
     hints.ai_family   = AF_UNSPEC;
     fd = t->fd;
     hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDPLITE;
 
     n = priv_getaddrinfo(t->bindaddr, t->bindport, &res, &hints);
     if (n <= 0)
@@ -811,6 +813,7 @@ mlvpn_rtun_start(mlvpn_tunnel_t *t)
     int ret, fd = -1;
     char *addr, *port;
     struct addrinfo hints, *res;
+    mlvpn_proto_t proto;
 #if defined(HAVE_FREEBSD) || defined(HAVE_OPENBSD)
     int fib = t->bindfib;
 #endif
@@ -828,6 +831,7 @@ mlvpn_rtun_start(mlvpn_tunnel_t *t)
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDPLITE;
 
     ret = priv_getaddrinfo(addr, port, &t->addrinfo, &hints);
     if (ret <= 0 || !t->addrinfo)
@@ -858,6 +862,21 @@ mlvpn_rtun_start(mlvpn_tunnel_t *t)
                 goto error;
             }
 #endif
+            // Set Checksum Coverage to udplite header + mlvpn header only
+            // as we can skip checksumming any payload as the encapsulated traffic already contains checksums.
+            int val = UDP_OVERHEAD + PKTHDRSIZ(proto);
+            if((ret = setsockopt(fd, SOL_UDPLITE, UDPLITE_RECV_CSCOV, &val, sizeof(int))) != 0){
+                log_warn(NULL, "%s failed to set UDPLITE_RECV_CSCOV: %s", t->name, strerror(ret));
+                goto error;
+            }
+
+            val = UDP_OVERHEAD + PKTHDRSIZ(proto);
+            if((ret = setsockopt(fd, SOL_UDPLITE, UDPLITE_SEND_CSCOV, &val, sizeof(int))) != 0){
+                log_warn(NULL, "%s failed to set UDPLITE_SEND_CSCOV: %s", t->name, strerror(ret));
+                goto error;
+            }
+
+
             t->fd = fd;
             break;
         }

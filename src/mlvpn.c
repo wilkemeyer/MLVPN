@@ -86,7 +86,6 @@ char *status_command = NULL;
 char *process_title = NULL;
 int logdebug = 0;
 
-static uint64_t data_seq = 0;
 
 struct mlvpn_status_s mlvpn_status = {
     .start_time = 0,
@@ -460,7 +459,7 @@ mlvpn_protocol_read(
     decap_pkt->type = proto.flags;
     if (proto.version >= 1) {
         decap_pkt->reorder = proto.reorder;
-        decap_pkt->seq = be64toh(proto.data_seq);
+        decap_pkt->seq = be64toh(proto.seq);
         mlvpn_loss_update(tun, proto.seq);
     } else {
         decap_pkt->reorder = 0;
@@ -505,9 +504,7 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
 
     mlvpn_pkt_t *pkt = mlvpn_pktbuffer_read(pktbuf);
     pkt->reorder = 1;
-    if (pkt->type == MLVPN_PKT_DATA && pkt->reorder) {
-        proto.data_seq = data_seq++;
-    }
+
     wlen = PKTHDRSIZ(proto) + pkt->len;
     proto.flags = pkt->type;
     if (pkt->reorder) {
@@ -532,7 +529,6 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     memcpy(&proto.data, &pkt->data, pkt->len);
     
     proto.seq = htobe64(proto.seq);
-    proto.data_seq = htobe64(proto.data_seq);
     proto.timestamp = htobe16(proto.timestamp);
     proto.timestamp_reply = htobe16(proto.timestamp_reply);
     ret = sendto(tun->fd, &proto, wlen, MSG_DONTWAIT,

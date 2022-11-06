@@ -48,7 +48,6 @@
 #include "mlvpn.h"
 #include "tool.h"
 #include "setproctitle.h"
-#include "crypto.h"
 #ifdef ENABLE_CONTROL
 #include "control.h"
 #endif
@@ -427,7 +426,6 @@ mlvpn_protocol_read(
     mlvpn_tunnel_t *tun, mlvpn_pkt_t *pkt,
     mlvpn_pkt_t *decap_pkt)
 {
-    unsigned char nonce[crypto_NONCEBYTES];
     int ret;
     uint16_t rlen;
     mlvpn_proto_t proto;
@@ -453,26 +451,10 @@ mlvpn_protocol_read(
     proto.timestamp = be16toh(proto.timestamp);
     proto.timestamp_reply = be16toh(proto.timestamp_reply);
     proto.flow_id = be32toh(proto.flow_id);
-    /* now auth the packet using libsodium before further checks */
-#ifdef ENABLE_CRYPTO
-    if (mlvpn_options.cleartext_data && proto.flags == MLVPN_PKT_DATA) {
-        memcpy(decap_pkt->data, &proto.data, rlen);
-    } else {
-        sodium_memzero(nonce, sizeof(nonce));
-        memcpy(nonce, &proto.seq, sizeof(proto.seq));
-        memcpy(nonce + sizeof(proto.seq), &proto.flow_id, sizeof(proto.flow_id));
-        if ((ret = crypto_decrypt((unsigned char *)decap_pkt->data,
-                                  (const unsigned char *)&proto.data, rlen,
-                                  nonce)) != 0) {
-            log_warnx("protocol", "%s crypto_decrypt failed: %d",
-                tun->name, ret);
-            goto fail;
-        }
-        rlen -= crypto_PADSIZE;
-    }
-#else
+
+    // crypto
     memcpy(decap_pkt->data, &proto.data, rlen);
-#endif
+
     decap_pkt->len = rlen;
     decap_pkt->type = proto.flags;
     if (proto.version >= 1) {
@@ -514,7 +496,6 @@ fail:
 static int
 mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
 {
-    unsigned char nonce[crypto_NONCEBYTES];
     ssize_t ret;
     size_t wlen;
     mlvpn_proto_t proto;
@@ -547,34 +528,10 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
         proto.timestamp_reply = -1;
     }
     proto.timestamp = mlvpn_timestamp16(now64);
-#ifdef ENABLE_CRYPTO
-    if (mlvpn_options.cleartext_data && pkt->type == MLVPN_PKT_DATA) {
-        memcpy(&proto.data, &pkt->data, pkt->len);
-    } else {
-        if (wlen + crypto_PADSIZE > sizeof(proto.data)) {
-            log_warnx("protocol", "%s packet too long: %u/%d (packet=%d)",
-                tun->name,
-                (unsigned int)wlen + crypto_PADSIZE,
-                (unsigned int)sizeof(proto.data),
-                pkt->len);
-            return -1;
-        }
-        sodium_memzero(nonce, sizeof(nonce));
-        memcpy(nonce, &proto.seq, sizeof(proto.seq));
-        memcpy(nonce + sizeof(proto.seq), &proto.flow_id, sizeof(proto.flow_id));
-        if ((ret = crypto_encrypt((unsigned char *)&proto.data,
-                                  (const unsigned char *)&pkt->data, pkt->len,
-                                  nonce)) != 0) {
-            log_warnx("protocol", "%s crypto_encrypt failed: %d incorrect password?",
-                tun->name, (int)ret);
-            return -1;
-        }
-        proto.len += crypto_PADSIZE;
-        wlen += crypto_PADSIZE;
-    }
-#else
+
+    // crypto.
     memcpy(&proto.data, &pkt->data, pkt->len);
-#endif
+    
     proto.len = htobe16(proto.len);
     proto.seq = htobe64(proto.seq);
     proto.data_seq = htobe64(proto.data_seq);
@@ -672,7 +629,7 @@ mlvpn_rtun_new(const char *name,
     _new->rtt_hit = 0;
     _new->seq_last = 0;
     _new->seq_vect = (uint64_t) -1;
-    _new->flow_id = crypto_nonce_random();
+    _new->flow_id = 0;
     _new->bandwidth = bandwidth;
     _new->fallback_only = fallback_only;
     _new->loss_tolerence = loss_tolerence;
@@ -1515,8 +1472,8 @@ main(int argc, char **argv)
         }
     }
 
-    if (crypto_init() == -1)
-        fatal(NULL, "libsodium initialization failed");
+    //if (crypto_init() == -1)
+    //    fatal(NULL, "libsodium initialization failed");
 
     log_init(mlvpn_options.debug, mlvpn_options.verbose, mlvpn_options.process_name);
 

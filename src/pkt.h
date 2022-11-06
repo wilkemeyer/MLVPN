@@ -25,7 +25,6 @@ typedef struct {
 
 /* packet sent on the wire. 20 bytes headers for mlvpn */
 typedef struct {
-    uint16_t len;
     uint16_t version: 4; /* protocol version */
     uint16_t flags: 6;   /* protocol options */
     uint16_t reorder: 1; /* do reordering or not */

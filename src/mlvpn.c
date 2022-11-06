@@ -426,7 +426,7 @@ mlvpn_protocol_read(
     mlvpn_tunnel_t *tun, mlvpn_pkt_t *pkt,
     mlvpn_pkt_t *decap_pkt)
 {
-    uint16_t rlen;
+    int16_t rlen;
     mlvpn_proto_t proto;
     uint64_t now64 = mlvpn_timestamp64(ev_now(EV_DEFAULT_UC));
     /* Overkill */
@@ -441,8 +441,10 @@ mlvpn_protocol_read(
         goto fail;
     }
     memcpy(&proto, pkt->data, pkt->len);
-    rlen = be16toh(proto.len);
-    if (rlen > sizeof(proto.data)) {
+
+    rlen = pkt->len - PKTHDRSIZ(proto);
+
+    if (rlen < 0 || rlen > sizeof(proto.data)) {
         log_warnx("protocol", "%s invalid packet size: %d", tun->name, rlen);
         goto fail;
     }
@@ -451,7 +453,7 @@ mlvpn_protocol_read(
     proto.timestamp_reply = be16toh(proto.timestamp_reply);
 
     // crypto
-    if(rlen > 0)
+    if(rlen > 0) 
         memcpy(decap_pkt->data, &proto.data, rlen);
 
     decap_pkt->len = rlen;
@@ -507,7 +509,6 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
         proto.data_seq = data_seq++;
     }
     wlen = PKTHDRSIZ(proto) + pkt->len;
-    proto.len = pkt->len;
     proto.flags = pkt->type;
     if (pkt->reorder) {
         proto.seq = tun->seq++;
@@ -530,7 +531,6 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     // crypto.
     memcpy(&proto.data, &pkt->data, pkt->len);
     
-    proto.len = htobe16(proto.len);
     proto.seq = htobe64(proto.seq);
     proto.data_seq = htobe64(proto.data_seq);
     proto.timestamp = htobe16(proto.timestamp);

@@ -369,7 +369,7 @@ mlvpn_rtun_read(EV_P_ ev_io *w, int revents)
 
         if ((tun->addrinfo->ai_addrlen != addrlen) ||
                 (memcmp(tun->addrinfo->ai_addr, &clientaddr, addrlen) != 0)) {
-            if (! tun->status >= MLVPN_AUTHOK) {
+            if (!  (tun->status >= MLVPN_AUTHOK)) {
                 log_warnx("protocol", "%s rejected non authenticated connection",
                     tun->name);
                 return;
@@ -426,7 +426,6 @@ mlvpn_protocol_read(
     mlvpn_tunnel_t *tun, mlvpn_pkt_t *pkt,
     mlvpn_pkt_t *decap_pkt)
 {
-    int ret;
     uint16_t rlen;
     mlvpn_proto_t proto;
     uint64_t now64 = mlvpn_timestamp64(ev_now(EV_DEFAULT_UC));
@@ -450,7 +449,6 @@ mlvpn_protocol_read(
     proto.seq = be64toh(proto.seq);
     proto.timestamp = be16toh(proto.timestamp);
     proto.timestamp_reply = be16toh(proto.timestamp_reply);
-    proto.flow_id = be32toh(proto.flow_id);
 
     // crypto
     if(rlen > 0)
@@ -514,7 +512,6 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     if (pkt->reorder) {
         proto.seq = tun->seq++;
     }
-    proto.flow_id = tun->flow_id;
     proto.version = MLVPN_PROTOCOL_VERSION;
     proto.reorder = pkt->reorder;
 
@@ -536,7 +533,6 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     proto.len = htobe16(proto.len);
     proto.seq = htobe64(proto.seq);
     proto.data_seq = htobe64(proto.data_seq);
-    proto.flow_id = htobe32(proto.flow_id);
     proto.timestamp = htobe16(proto.timestamp);
     proto.timestamp_reply = htobe16(proto.timestamp_reply);
     ret = sendto(tun->fd, &proto, wlen, MSG_DONTWAIT,
@@ -630,7 +626,6 @@ mlvpn_rtun_new(const char *name,
     _new->rtt_hit = 0;
     _new->seq_last = 0;
     _new->seq_vect = (uint64_t) -1;
-    _new->flow_id = 0;
     _new->bandwidth = bandwidth;
     _new->fallback_only = fallback_only;
     _new->loss_tolerence = loss_tolerence;

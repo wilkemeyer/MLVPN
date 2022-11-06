@@ -161,7 +161,6 @@ typedef struct mlvpn_tunnel_s
     double srtt;
     double rttvar;
     double weight;        /* For weight round robin */
-    uint32_t flow_id;
     uint64_t sentpackets; /* 64bit packets sent counter */
     uint64_t recvpackets; /* 64bit packets recv counter */
     uint64_t sentbytes;   /* 64bit bytes sent counter */

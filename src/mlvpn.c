@@ -338,7 +338,7 @@ mlvpn_rtun_recv_data(mlvpn_tunnel_t *tun, mlvpn_pkt_t *inpkt)
 static void
 mlvpn_rtun_read(EV_P_ ev_io *w, int revents)
 {
-    mlvpn_tunnel_t *tun = w->data;
+    mlvpn_tunnel_t *tun = (mlvpn_tunnel_t*) w->data;
     ssize_t len;
     struct sockaddr_storage clientaddr;
     socklen_t addrlen = sizeof(clientaddr);
@@ -370,7 +370,7 @@ mlvpn_rtun_read(EV_P_ ev_io *w, int revents)
 
         if ((tun->addrinfo->ai_addrlen != addrlen) ||
                 (memcmp(tun->addrinfo->ai_addr, &clientaddr, addrlen) != 0)) {
-            if (! tun->status >= MLVPN_AUTHOK) {
+            if (! (tun->status >= MLVPN_AUTHOK)) {
                 log_warnx("protocol", "%s rejected non authenticated connection",
                     tun->name);
                 return;
@@ -612,7 +612,7 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
 static void
 mlvpn_rtun_write(EV_P_ ev_io *w, int revents)
 {
-    mlvpn_tunnel_t *tun = w->data;
+    mlvpn_tunnel_t *tun = (mlvpn_tunnel_t*) w->data;
     if (! mlvpn_cb_is_empty(tun->hpsbuf)) {
         mlvpn_rtun_send(tun, tun->hpsbuf);
     }
@@ -630,7 +630,7 @@ mlvpn_rtun_new(const char *name,
                int fallback_only, uint32_t bandwidth,
                uint32_t loss_tolerence, uint32_t latency_tolerence)
 {
-    mlvpn_tunnel_t *new;
+    mlvpn_tunnel_t *_new;
 
     /* Some basic checks */
     if (server_mode)
@@ -650,58 +650,58 @@ mlvpn_rtun_new(const char *name,
         }
     }
 
-    new = (mlvpn_tunnel_t *)calloc(1, sizeof(mlvpn_tunnel_t));
-    if (! new)
+    _new = (mlvpn_tunnel_t *)calloc(1, sizeof(mlvpn_tunnel_t));
+    if (! _new)
         fatal(NULL, "calloc failed");
     /* other values are enforced by calloc to 0/NULL */
-    new->name = strdup(name);
-    new->fd = -1;
-    new->server_mode = server_mode;
-    new->weight = 1;
-    new->status = MLVPN_DISCONNECTED;
-    new->addrinfo = NULL;
-    new->sentpackets = 0;
-    new->sentbytes = 0;
-    new->recvbytes = 0;
-    new->seq = 0;
-    new->expected_receiver_seq = 0;
-    new->saved_timestamp = -1;
-    new->saved_timestamp_received_at = 0;
-    new->srtt = 1000;
-    new->rttvar = 500;
-    new->rtt_hit = 0;
-    new->seq_last = 0;
-    new->seq_vect = (uint64_t) -1;
-    new->flow_id = crypto_nonce_random();
-    new->bandwidth = bandwidth;
-    new->fallback_only = fallback_only;
-    new->loss_tolerence = loss_tolerence;
-    new->latency_tolerence = latency_tolerence;
+    _new->name = strdup(name);
+    _new->fd = -1;
+    _new->server_mode = server_mode;
+    _new->weight = 1;
+    _new->status = MLVPN_DISCONNECTED;
+    _new->addrinfo = NULL;
+    _new->sentpackets = 0;
+    _new->sentbytes = 0;
+    _new->recvbytes = 0;
+    _new->seq = 0;
+    _new->expected_receiver_seq = 0;
+    _new->saved_timestamp = -1;
+    _new->saved_timestamp_received_at = 0;
+    _new->srtt = 1000;
+    _new->rttvar = 500;
+    _new->rtt_hit = 0;
+    _new->seq_last = 0;
+    _new->seq_vect = (uint64_t) -1;
+    _new->flow_id = crypto_nonce_random();
+    _new->bandwidth = bandwidth;
+    _new->fallback_only = fallback_only;
+    _new->loss_tolerence = loss_tolerence;
+    _new->latency_tolerence = latency_tolerence;
     if (bindaddr)
-        strlcpy(new->bindaddr, bindaddr, sizeof(new->bindaddr));
+        strlcpy(_new->bindaddr, bindaddr, sizeof(_new->bindaddr));
     if (bindport)
-        strlcpy(new->bindport, bindport, sizeof(new->bindport));
-    new->bindfib = bindfib;
+        strlcpy(_new->bindport, bindport, sizeof(_new->bindport));
+    _new->bindfib = bindfib;
     if (destaddr)
-        strlcpy(new->destaddr, destaddr, sizeof(new->destaddr));
+        strlcpy(_new->destaddr, destaddr, sizeof(_new->destaddr));
     if (destport)
-        strlcpy(new->destport, destport, sizeof(new->destport));
-    new->sbuf = mlvpn_pktbuffer_init(PKTBUFSIZE);
-    new->hpsbuf = mlvpn_pktbuffer_init(PKTBUFSIZE);
-    mlvpn_rtun_tick(new);
-    new->timeout = timeout;
-    new->next_keepalive = 0;
-    LIST_INSERT_HEAD(&rtuns, new, entries);
-    new->io_read.data = new;
-    new->io_write.data = new;
-    new->io_timeout.data = new;
-    ev_init(&new->io_read, mlvpn_rtun_read);
-    ev_init(&new->io_write, mlvpn_rtun_write);
-    ev_timer_init(&new->io_timeout, mlvpn_rtun_check_timeout,
+        strlcpy(_new->destport, destport, sizeof(_new->destport));
+    _new->sbuf = mlvpn_pktbuffer_init(PKTBUFSIZE);
+    _new->hpsbuf = mlvpn_pktbuffer_init(PKTBUFSIZE);
+    mlvpn_rtun_tick(_new);
+    _new->timeout = timeout;
+    _new->next_keepalive = 0;
+    LIST_INSERT_HEAD(&rtuns, _new, entries);
+    _new->io_read.data = _new;
+    _new->io_write.data = _new;
+    _new->io_timeout.data = _new;
+    ev_init(&_new->io_read, mlvpn_rtun_read);
+    ev_init(&_new->io_write, mlvpn_rtun_write);
+    ev_timer_init(&_new->io_timeout, mlvpn_rtun_check_timeout,
         0., MLVPN_IO_TIMEOUT_DEFAULT);
-    ev_timer_start(EV_A_ &new->io_timeout);
+    ev_timer_start(EV_A_ &_new->io_timeout);
     update_process_title();
-    return new;
+    return _new;
 }
 
 void
@@ -910,41 +910,41 @@ mlvpn_script_get_env(int *env_len, char ***env) {
         fatal(NULL, "out of memory");
     envp = *env;
     arglen = sizeof(mlvpn_options.ip4) + 4;
-    envp[0] = calloc(1, arglen + 1);
+    envp[0] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[0], arglen, "IP4=%s", mlvpn_options.ip4) < 0)
         log_warn(NULL, "snprintf IP4= failed");
 
     arglen = sizeof(mlvpn_options.ip6) + 4;
-    envp[1] = calloc(1, arglen + 1);
+    envp[1] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[1], arglen, "IP6=%s", mlvpn_options.ip6) < 0)
         log_warn(NULL, "snprintf IP6= failed");
 
     arglen = sizeof(mlvpn_options.ip4_gateway) + 12;
-    envp[2] = calloc(1, arglen + 1);
+    envp[2] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[2], arglen, "IP4_GATEWAY=%s", mlvpn_options.ip4_gateway) < 0)
         log_warn(NULL, "snprintf IP4_GATEWAY= failed");
 
     arglen = sizeof(mlvpn_options.ip6_gateway) + 12;
-    envp[3] = calloc(1, arglen + 1);
+    envp[3] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[3], arglen, "IP6_GATEWAY=%s", mlvpn_options.ip6_gateway) < 0)
         log_warn(NULL, "snprintf IP6_GATEWAY= failed");
 
     arglen = sizeof(mlvpn_options.ip4_routes) + 11;
-    envp[4] = calloc(1, arglen + 1);
+    envp[4] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[4], arglen, "IP4_ROUTES=%s", mlvpn_options.ip4_routes) < 0)
         log_warn(NULL, "snprintf IP4_ROUTES= failed");
 
     arglen = sizeof(mlvpn_options.ip6_routes) + 11;
-    envp[5] = calloc(1, arglen + 1);
+    envp[5] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[5], arglen, "IP6_ROUTES=%s", mlvpn_options.ip6_routes) < 0)
         log_warn(NULL, "snprintf IP6_ROUTES= failed");
 
     arglen = sizeof(tuntap.devname) + 7;
-    envp[6] = calloc(1, arglen + 1);
+    envp[6] = (char*)calloc(1, arglen + 1);
     if (snprintf(envp[6], arglen, "DEVICE=%s", tuntap.devname) < 0)
         log_warn(NULL, "snprintf DEVICE= failed");
 
-    envp[7] = calloc(1, 16);
+    envp[7] = (char*)calloc(1, 16);
     if (snprintf(envp[7], 15, "MTU=%d", mlvpn_options.mtu) < 0)
         log_warn(NULL, "snprintf MTU= failed");
     envp[8] = NULL;
@@ -1234,7 +1234,7 @@ mlvpn_rtun_check_slow(mlvpn_tunnel_t *tun)
 static void
 mlvpn_rtun_check_timeout(EV_P_ ev_timer *w, int revents)
 {
-    mlvpn_tunnel_t *t = w->data;
+    mlvpn_tunnel_t *t = (mlvpn_tunnel_t*) w->data;
     ev_tstamp now = ev_now(EV_DEFAULT_UC);
     if (t->status >= MLVPN_AUTHOK && t->timeout > 0) {
         if ((t->last_keepalive_ack != 0) && (t->last_keepalive_ack + t->timeout) < now) {
@@ -1409,7 +1409,7 @@ main(int argc, char **argv)
     log_init(1, 2, "mlvpn");
 
     _progname = strdup(__progname);
-    saved_argv = calloc(argc + 1, sizeof(*saved_argv));
+    saved_argv = (char**)calloc(argc + 1, sizeof(*saved_argv));
     for(i = 0; i < argc; i++) {
         saved_argv[i] = strdup(argv[i]);
     }

@@ -163,6 +163,7 @@ mlvpn_protocol_read(mlvpn_tunnel_t *tun,
                     mlvpn_pkt_t *rawpkt,
                     mlvpn_pkt_t *decap_pkt);
 
+static uint64_t data_seq = 0;
 
 static void
 usage(char **argv)
@@ -457,14 +458,11 @@ mlvpn_protocol_read(
 
     decap_pkt->len = rlen;
     decap_pkt->type = proto.flags;
-    if (proto.version >= 1) {
-        decap_pkt->reorder = proto.reorder;
-        decap_pkt->seq = be64toh(proto.seq);
-        mlvpn_loss_update(tun, proto.seq);
-    } else {
-        decap_pkt->reorder = 0;
-        decap_pkt->seq = 0;
-    }
+
+    decap_pkt->reorder = proto.reorder;
+    decap_pkt->seq = be64toh(proto.seq);
+    mlvpn_loss_update(tun, proto.seq);
+
     if (proto.timestamp != (uint16_t)-1) {
         tun->saved_timestamp = proto.timestamp;
         tun->saved_timestamp_received_at = now64;
@@ -507,9 +505,8 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
 
     wlen = PKTHDRSIZ(proto) + pkt->len;
     proto.flags = pkt->type;
-    if (pkt->reorder) {
-        proto.seq = tun->seq++;
-    }
+    proto.seq = data_seq++;
+
     proto.version = MLVPN_PROTOCOL_VERSION;
     proto.reorder = pkt->reorder;
 
@@ -613,7 +610,6 @@ mlvpn_rtun_new(const char *name,
     _new->sentpackets = 0;
     _new->sentbytes = 0;
     _new->recvbytes = 0;
-    _new->seq = 0;
     _new->expected_receiver_seq = 0;
     _new->saved_timestamp = -1;
     _new->saved_timestamp_received_at = 0;

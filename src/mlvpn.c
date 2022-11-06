@@ -461,7 +461,7 @@ mlvpn_protocol_read(
 
     decap_pkt->reorder = proto.reorder;
     decap_pkt->seq = be64toh(proto.seq);
-    mlvpn_loss_update(tun, proto.seq);
+    mlvpn_loss_update(tun, decap_pkt->seq);
 
     if (proto.timestamp != (uint16_t)-1) {
         tun->saved_timestamp = proto.timestamp;

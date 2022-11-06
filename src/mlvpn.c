@@ -448,8 +448,9 @@ mlvpn_protocol_read(
         log_warnx("protocol", "%s invalid packet size: %d", tun->name, rlen);
         goto fail;
     }
-
-    proto.seq = be64toh(proto.seq);
+    
+    proto.data_seq = be64toh(proto.seq);
+    proto.data_seq = be64toh(proto.data_seq);
     proto.timestamp = be16toh(proto.timestamp);
     proto.timestamp_reply = be16toh(proto.timestamp_reply);
 
@@ -461,7 +462,7 @@ mlvpn_protocol_read(
     decap_pkt->type = proto.flags;
 
     decap_pkt->reorder = proto.reorder;
-    decap_pkt->seq = proto.seq;
+    decap_pkt->seq = proto.data_seq;
     mlvpn_loss_update(tun, proto.seq);
 
     if (proto.timestamp != (uint16_t)-1) {
@@ -506,7 +507,13 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
 
     wlen = PKTHDRSIZ(proto) + pkt->len;
     proto.flags = pkt->type;
-    proto.seq = data_seq++;
+
+    proto.seq = tun->seq++;
+
+    if(pkt->type == MLVPN_PKT_DATA)
+        proto.data_seq = data_seq++;
+    else
+        proto.data_seq = 0;
 
     proto.version = MLVPN_PROTOCOL_VERSION;
     proto.reorder = pkt->reorder;
@@ -527,6 +534,7 @@ mlvpn_rtun_send(mlvpn_tunnel_t *tun, circular_buffer_t *pktbuf)
     memcpy(&proto.data, &pkt->data, pkt->len);
     
     proto.seq = htobe64(proto.seq);
+    proto.data_seq = htobe64(proto.data_seq);
     proto.timestamp = htobe16(proto.timestamp);
     proto.timestamp_reply = htobe16(proto.timestamp_reply);
     ret = sendto(tun->fd, &proto, wlen, MSG_DONTWAIT,
@@ -617,6 +625,7 @@ mlvpn_rtun_new(const char *name,
     _new->srtt = 1000;
     _new->rttvar = 500;
     _new->rtt_hit = 0;
+    _new->seq = 0;
     _new->seq_last = 0;
     _new->seq_vect = (uint64_t) -1;
     _new->bandwidth = bandwidth;

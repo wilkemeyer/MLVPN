@@ -448,6 +448,7 @@ mlvpn_protocol_read(
         log_warnx("protocol", "%s invalid packet size: %d", tun->name, rlen);
         goto fail;
     }
+
     proto.seq = be64toh(proto.seq);
     proto.timestamp = be16toh(proto.timestamp);
     proto.timestamp_reply = be16toh(proto.timestamp_reply);
@@ -460,8 +461,8 @@ mlvpn_protocol_read(
     decap_pkt->type = proto.flags;
 
     decap_pkt->reorder = proto.reorder;
-    decap_pkt->seq = be64toh(proto.seq);
-    mlvpn_loss_update(tun, decap_pkt->seq);
+    decap_pkt->seq = proto.seq;
+    mlvpn_loss_update(tun, proto.seq);
 
     if (proto.timestamp != (uint16_t)-1) {
         tun->saved_timestamp = proto.timestamp;

@@ -443,7 +443,7 @@ mlvpn_protocol_read(
     }
     memcpy(&proto, pkt->data, pkt->len);
     rlen = be16toh(proto.len);
-    if (rlen == 0 || rlen > sizeof(proto.data)) {
+    if (rlen > sizeof(proto.data)) {
         log_warnx("protocol", "%s invalid packet size: %d", tun->name, rlen);
         goto fail;
     }
@@ -453,7 +453,8 @@ mlvpn_protocol_read(
     proto.flow_id = be32toh(proto.flow_id);
 
     // crypto
-    memcpy(decap_pkt->data, &proto.data, rlen);
+    if(rlen > 0)
+        memcpy(decap_pkt->data, &proto.data, rlen);
 
     decap_pkt->len = rlen;
     decap_pkt->type = proto.flags;
